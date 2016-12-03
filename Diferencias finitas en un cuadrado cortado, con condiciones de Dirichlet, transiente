@@ -1,0 +1,148 @@
+function [x,y,Phi]=fluxCortDT(m,l,t,f,g)
+%% Especificaiones
+% Aproxima, por medio de diferencias finitas, la ecuaci\'on de Laplace
+% con condiciones de Dirichlet en las fronteras.
+% En un dominio en forma de cuadrado [0,1]x[0,1], con la esquina inferior
+% izquierda cortada. Que se mueve en el tiempo de 0 a 1
+% m n\'umero puntos del cuadrado
+% l n\'umero de puntos antes de la diagonal, sobre front. izq. e inferior.
+% f funci\'on
+% g condiciones de frontera
+% t puntos en el tiempo
+% si c=d/(h*h)<1 el esquema es estable.
+% Martha Leticia Ruiz Zavala. Noviembre 2016
+% Ejemplo: [x,y,Phi]=fluxCortDT(25,l5,10000,@f,@g);
+
+%% Inicialización
+close all;
+h=1/(m-1);
+Phi=zeros(m,m,t);
+T=linspace(0,1,t);
+dt = T(2)-T(1);
+c=dt/(h*h);
+if c>1
+    h = msgbox('El esquema es inestable, cosas extrañas pueden suceder', 'dt/(h^2)>1','warn');
+end
+% Condiciones iniciales
+[x,y,Phi0]=fluxCortD(m,l,f,g);
+Phi(:,:,1)=Phi0;
+
+%% Calculamos con un paso de tiempo hacia adelante%% Puntos no contiguos a la frontera
+for k=2:t
+    % Primer bloque
+    p=0;
+    for j=3:m-l
+        for i=3:l+p
+            Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i-1,j,k-1)+Phi(i,j+1,k-1)+...
+                Phi(i+1,j,k-1)+Phi(i,j-1,k-1)-4*Phi(i,j,k-1)+...
+                f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+        end
+        p=p+1;
+    end
+    % Segundo bloque
+    for j=m-l+1:m-2
+        for i=3:m-2
+            Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i-1,j,k-1)+Phi(i,j+1,k-1)+...
+                Phi(i+1,j,k-1)+Phi(i,j-1,k-1)-4*Phi(i,j,k-1)+...
+                f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+        end
+    end
+    %% Puntos contiguos a las fronteras
+    % A la frontera izquierda
+    j=2;
+    for i=2:l
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(g([x(i,j-1),y(i,j-1)],(k-2)*dt)+...
+            Phi(i,j+1,k-1)-4*Phi(i,j,k-1)+f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+        if i==2 % esquina superior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([x(i-1,j),y(i-1,j)],(k-2)*dt)+...
+                Phi(i+1,j,k-1));
+        elseif i==l % esquina inferior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+...
+                g([x(i+1,j),y(i+1,j)],(k-2)*dt));
+        else % rellenito
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+Phi(i+1,j,k-1));
+        end
+    end
+    
+    % A la frontera derecha
+    j=m-1;
+    for i=2:m-1
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i,j-1,k-1)+...
+            g([x(i,j+1),y(i,j+1)],(k-2)*dt)-4*Phi(i,j,k-1)+...
+            f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+        if i==2 % esquina superior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([x(i-1,j),y(i-1,j)],(k-2)*dt)+...
+                Phi(i+1,j,k-1));
+        elseif i==m-1 % esquina inferior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+...
+                g([x(i+1,j),y(i+1,j)],(k-2)*dt));
+        else % rellenito
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+Phi(i+1,j,k-1));
+        end
+    end
+    
+    % A la frontera inferior
+    i=m-1;
+    for j=m-l+1:m-2
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i-1,j,k-1)+...
+            Phi(i,j+1,k-1)+g([x(i+1,j),y(i+1,j)],(k-2)*dt)-...
+            4*Phi(i,j,k-1)+f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+        if j==m-l+1 % esquina inferior izquierda, junto a la diagonal
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([x(i,j-1),y(i,j-1)],(k-2)*dt));
+        else
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i,j-1,k-1));
+        end
+    end
+    
+    % A la frontera superior
+    i=2;
+    for j=3:m-2
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i,j-1,k-1)+...
+            g([x(i-1,j),y(i-1,j)],(k-2)*dt)+Phi(i,j+1,k-1)+Phi(i+1,j,k-1)-...
+            4*Phi(i,j,k-1)+f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+    end
+    
+    % A la frontera diagonal
+    for i=l+1:m-2
+        for j=3:m-l
+            if i-j==l-2 % puntos en la diagonal
+                Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i-1,j,k-1)+...
+                    g([x(i+1,j),y(i+1,j)],(k-2)*dt)+Phi(i,j+1,k-1)+...
+                    g([x(i,j-1),y(i,j-1)],(k-2)*dt)-4*Phi(i,j,k-1)+...
+                    f([x(i,j),y(i,j)],(k-2)*dt)*h*h);
+               
+            end
+        end
+    end
+
+    % Condiciones de frontera
+     % Frontera izquierda
+    for i=1:l
+        Phi(i,1,k)=g([x(i,1),y(i,1)],(k-1)*dt);
+    end
+    % Frontera superior
+    for j=1:m
+        Phi(1,j,k)=g([x(1,j),y(1,j)],(k-1)*dt);
+    end
+    % Frontera derecha
+    for i=1:m
+        Phi(i,m,k)=g([x(i,m),y(i,m)],(k-1)*dt);
+    end
+    % Frontera inferior
+    for j=m-l+1:m
+        Phi(m,j,k)=g([x(m,j),y(m,j)],(k-1)*dt);
+    end
+    % Frontera diagonal
+    for i=l:m
+        for j=1:m-l+1
+            if i-j==l-1
+                Phi(i,j,k)=g([x(i,j),y(i,j)],(k-1)*dt);
+            end
+        end
+    end
+end
+%% Graficamos
+ for k=2:t
+     surf(x,y,Phi(:,:,k));pause(.1);
+ end
+end
