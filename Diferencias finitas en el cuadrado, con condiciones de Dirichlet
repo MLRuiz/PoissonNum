@@ -1,0 +1,105 @@
+function [x,y,Phi]=fluxCD(m,f,g)
+%% Especificaciones
+% Aproxima, por medio de diferencias finitas, la ecuaci\'on de Laplace
+% con condiciones de Dirichlet en las
+% fronteras. En un cuadrado de [0,1]x[0,1].
+% m n\'umero de puntos de la malla
+% f funci\'on de velocidad
+% g condiciones de frontera
+% phi potencial
+% p etiqueta a todos los puntos con una posici\'n general
+% M matriz de pesos
+% Martha Leticia Ruiz Zavala. Noviembre 2016
+% Ejemplo: [x,y,Phi]=fluxCD(5,@f,@g);
+
+%% Inicialización
+% close all
+h=1/(m-1);
+[x,y]=meshgrid(0:h:1);
+RHS=sparse((m-2)*(m-2),1);
+Phi=sparse(m,m);
+M=sparse((m-2)*(m-2),(m-2)*(m-2));
+k=0;
+x=flipud(x);
+y=flipud(y);
+
+%% Puntos no contiguos a la frontera
+for j=3:(m-2)
+    for i=3:(m-2)
+        p=(m-2)*(j-2)+(i-1);
+        RHS(p)=RHS(p)-f([x(i,j),y(i,j)],k)*h*h;
+        M(p,(p-1):(p+1))=[1 -4 1];
+        M(p,p-(m-2))=1;
+        M(p,p+(m-2))=1;
+    end
+end
+%% Puntos contiguos a las fronteras verticales
+for i=2:(m-1)
+    % Izquierda
+    p=(i-1);
+    RHS(p)=RHS(p)-f([x(i,2),y(i,2)],k)*h*h - g([x(i,1),y(i,1)],k);
+    M(p,p+(m-2))=1;
+    if(i==2) % esquina superior izquierda
+        RHS(p)=RHS(p)-g([x(1,2),y(1,2)],k);
+        M(p,p:(p+1))=[-4 1];
+    elseif (i==(m-1)) % esquina inferior izquierda
+        RHS(p) = RHS(p)-g([x(m,2),y(m,2)],k);
+        M(p,(p-1):(p))=[1 -4];
+    else
+        M(p,(p-1):(p+1))=[1 -4 1];
+    end
+    
+    % Derecha
+    p=(m-2)*(m-3)+(i-1);
+    RHS(p)= RHS(p)-f([x(i,m-1),y(i,m-1)],k)*h*h - g([x(i,m),y(i,m)],k);
+    M(p,p-(m-2))=1;
+    if (i==2) % esquina superior derecha
+        RHS(p)= RHS(p) - g([x(1,m-1),y(1,m-1)],k);
+        M(p,p:(p+1))=[-4 1];
+    elseif (i==(m-1)) % esquina inferior derecha
+        RHS(p)=RHS(p)-g([x(m,m-1),y(m,m-1)],k);
+        M(p,(p-1):p)=[1 -4];
+    else
+        M(p,(p-1):(p+1))=[1 -4 1];
+    end
+end
+
+%% Puntos contiguos a las fronteras horizontales
+for j=3:m-2
+    % Inferior
+    p = (m-2)*(j-1);
+    RHS(p)= RHS(p) -f([x(m-1,j),y(m-1,j)],k)*h*h - g([x(m,j),y(m,j)],k);
+    M(p,(p-1):(p))=[1 -4];
+    M(p,p+(m-2))=1;
+    M(p,p-(m-2))=1;
+    
+    % Superior
+    p = (m-2)*(j-2)+1;
+    RHS(p)= RHS(p)-f([x(2,j),y(2,j)],k)*h*h - g([x(1,j),y(1,j)],k);
+    M(p,p:(p+1))=[-4 1];
+    M(p,p+(m-2))=1;
+    M(p,p-(m-2))=1;
+end
+%% Soluci\'on
+% Aproximaci\'on de Phi para los nodos interiores
+Phi(2:(m-1),2:(m-1))=reshape(M\RHS,m-2,m-2);
+% Condiciones en la frontera
+% Orilla izquierda
+for i=1:m
+    Phi(i,1)=g([x(i,1),y(i,1)],k);
+end
+% Orilla inferior
+for j=1:m
+    Phi(m,j)=g([x(m,j),y(m,j)],k);
+end
+% Orilla derecha
+for i=1:m
+    Phi(i,m)=g([x(i,m),y(i,m)],k);
+end
+% Orilla superior
+for j=1:m
+    Phi(1,j)=g([x(1,j),y(1,j)],k);
+end
+%% Graficamos la soluci\'on
+surf(x,y,Phi)
+end
