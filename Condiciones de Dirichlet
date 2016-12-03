@@ -1,0 +1,6 @@
+%% Ejemplo de la funci\'on con las condiciones de Dirichlet
+function g=g(p,k)
+for i=1:size(p,1)
+    g(i)=exp(-k)*exp(2*p(i,1)+p(i,2));
+end
+g=g(:);
