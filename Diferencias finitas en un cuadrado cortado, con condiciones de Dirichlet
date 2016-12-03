@@ -1,0 +1,194 @@
+function [x,y,Phi]=fluxCortD(m,l,f,g)
+%% Especificaiones
+% Aproxima, por medio de diferencias finitas, la ecuaci\'on de Laplace
+% con condiciones de Dirichlet en las fronteras.
+% En un dominio en forma de cuadrado [0,1]x[0,1], con la esquina inferior
+% izquierda cortada.
+% m n\'umero puntos del cuadrado
+% l n\'umero de puntos antes de la diagonal, sobre front. izq. e inferior.
+% f funci\'on
+% g condiciones de frontera
+% phi potencial
+% p etiqueta a todos los puntos con una posici\'n general
+% np n\'umero de puntos interiores de la malla
+% M matriz de pesos
+% Martha Leticia Ruiz Zavala. Noviembre 2016
+% Ejemplo: [x,y,Phi]=fluxCortD(25,15,@f,@g);
+
+%% Inicialización
+close all;
+h=1/(m-1);
+[x,y]=meshgrid(0:h:1);
+x=flipud(x);
+y=flipud(y);
+np=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(l-1)*(m-2);
+RHS=sparse(np,1);
+M=sparse(np,np);
+Phi=sparse(m,m);
+t=0; % no nos movemos en el tiempo
+%% Puntos no contiguos a la frontera
+% Primer bloque
+c=0;
+for j=3:m-l
+    for i=3:l+c
+        p=(l-1)*(j-2)+(j-2)*(j-3)/2+(i-1);
+        RHS(p)=RHS(p)-f([x(i,j),y(i,j)],t)*h*h;
+        M(p,(p-1):(p+1))=[1 -4 1];
+        M(p,p-((l-1)+(j-3)))=1;
+        M(p,p+((l-1)+(j-2)))=1;
+    end
+    c=c+1;
+end
+% Pedazo rebelde
+j=m-l+1;
+for i=3:m-2
+    p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(j-(m-l+1))*(m-2)+(i-1);
+    RHS(p)=RHS(p)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,(p-1):(p+1))=[1 -4 1];
+    M(p,p-(m-3))=1;
+    M(p,p+(m-2))=1;
+end
+% Segundo bloque
+for j=m-l+2:m-2
+    for i=3:m-2
+        p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(j-(m-l+1))*(m-2)+(i-1);
+        RHS(p)=RHS(p)-f([x(i,j),y(i,j)],t)*h*h;
+        M(p,(p-1):(p+1))=[1 -4 1];
+        M(p,p-(m-2))=1;
+        M(p,p+(m-2))=1;
+    end
+end
+%% Puntos contiguos a las fronteras
+% A la frontera izquierda
+j=2;
+for i=2:l
+    p=i-1;
+    RHS(p)=RHS(p)-g([x(i,j-1),y(i,j-1)],t)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,p+(l-1))=1;
+    if i==2 % esquina superior izquierda
+        RHS(p)=RHS(p)-g([x(i-1,j),y(i-1,j)],t);
+        M(p,p:p+1)=[-4 1];
+    elseif i==l % esquina inferior izquierda
+        RHS(p)=RHS(p)-g([x(i+1,j),y(i+1,j)],t);
+        M(p,p-1:p)=[1 -4];
+    else % rellenito
+        M(p,p-1:p+1)=[1 -4 1];
+    end
+end
+
+% A la frontera derecha
+j=m-1;
+for i=2:m-1
+    p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(l-2)*(m-2)+(i-1);
+    RHS(p)=RHS(p)-g([x(i,j+1),y(i,j+1)],t)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,p-(m-2))=1;
+    if i==2 % esquina superior derecha
+        RHS(p)=RHS(p)-g([x(i-1,j),y(i-1,j)],t);
+        M(p,p:p+1)=[-4 1];
+    elseif i==m-1 % esquina inferior derecha
+        RHS(p)=RHS(p)-g([x(i+1,j),y(i+1,j)],t);
+        M(p,p-1:p)=[1 -4];
+    else % rellenito
+        M(p,p-1:p+1)=[1 -4 1];
+    end
+end
+
+% A la frontera inferior
+i=m-1;
+for j=m-l+1:m-2
+    p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(j-(m-l))*(m-2);
+    RHS(p)=RHS(p)-g([x(i+1,j),y(i+1,j)],t)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,p-1:p)=[1 -4];
+    M(p,p+(m-2))=1;
+    if j==m-l+1 % esquina inferior izquierda, junto a la diagonal
+        RHS(p)=RHS(p)-g([x(i,j-1),y(i,j-1)],t);
+    else
+        M(p,p-(m-2))=1;
+    end
+end
+
+% A la frontera superior
+i=2;
+% Primera parte
+for j=3:m-l
+    p=(j-2)*((l-1)+(j-3)/2)+1;
+    RHS(p)=RHS(p)-g([x(i-1,j),y(i-1,j)],t)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,p:p+1)=[-4 1];
+    M(p,p-((l-1)+(j-3)))=1;
+    M(p,p+((l-1)+(j-2)))=1;
+end
+% Punto volador
+j=m-l+1;
+p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+1;
+RHS(p)=RHS(p)-g([x(i-1,j),y(i-1,j)],t)-f([x(i,j),y(i,j)],t)*h*h;
+M(p,p:p+1)=[-4 1];
+M(p,p-(m-3))=1;
+M(p,p+(m-2))=1;
+% Segunda parte
+for j=m-l+2:m-2
+    p=(l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+(j-(m-l+1))*(m-2)+1;
+    RHS(p)=RHS(p)-g([x(i-1,j),y(i-1,j)],t)-f([x(i,j),y(i,j)],t)*h*h;
+    M(p,p:p+1)=[-4 1];
+    M(p,p-(m-2))=1;
+    M(p,p+(m-2))=1;
+end
+
+% A la frontera diagonal
+for i=l+1:m-2
+    for j=3:m-l
+        if i-j==l-2 % puntos en la diagonal
+            p=(j-1)*((l-1)+(j-2)/2);
+            RHS(p)=RHS(p)-g([x(i,j-1),y(i,j-1)],t)-...
+                g([x(i+1,j),y(i+1,j)],t)-f([x(i,j),y(i,j)],t)*h*h;
+            M(p,p-1:p)=[1 -4];
+            M(p,p+((l-1)+(j-2)))=1;
+        end
+    end
+end
+%% Calculamos vector solici\'on phi
+phi=M\RHS;
+%% Llenamos matriz Phi de soluciones en cada punto
+% Bloque trapeziodal
+c=0;
+for j=2:m-l+1
+    for i=2:l+c
+        Phi(i,j)=phi((j-2)*(l-1)+(j-2)*(j-3)/2+(i-1));
+    end
+    c=c+1;
+end
+% Bloque rectangular
+for j=m-l+2:m-1
+    for i=2:m-1
+        Phi(i,j)=phi((l-1)*(m-l-1)+(m-l-2)*(m-l-1)/2+...
+            (j-(m-l+1))*(m-2)+(i-1));
+    end
+end
+% Condiciones de frontera
+% Frontera izquierda
+for i=1:l
+    Phi(i,1)=g([x(i,1),y(i,1)],t);
+end
+% Frontera superior
+for j=1:m
+    Phi(1,j)=g([x(1,j),y(1,j)],t);
+end
+% Frontera derecha
+for i=1:m
+    Phi(i,m)=g([x(i,m),y(i,m)],t);
+end
+% Frontera inferior
+for j=m-l+1:m
+    Phi(m,j)=g([x(m,j),y(m,j)],t);
+end
+% Frontera diagonal
+for i=l:m
+    for j=1:m-l+1
+        if i-j==l-1
+            Phi(i,j)=g([x(i,j),y(i,j)],t);
+        end
+    end
+end
+
+%% Graficamos
+surf(x,y,Phi);
+end
