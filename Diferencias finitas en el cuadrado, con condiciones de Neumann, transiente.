@@ -1,0 +1,93 @@
+function [x,y,Phi,c]=fluxCNT(m,t,f,g,H,alpha)
+%% Especificaciones
+% Aproxima, por medio de diferencias finitas, la ecuaci\'on de Laplace
+% con condiciones de Neumann en las fronteras verticales, y de Dirichlet
+% en las horizontales. En un cuadrado de [0,1]x[0,1]. Que se mueve en el
+% tiempo de 0 o a 10.
+% m n\'umero de puntos de la malla
+% f funci\'on de velocidad
+% g condiciones de frontera Dirichlet
+% H condiciones de Neumann
+% p etiqueta a todos los puntos con una posici\'n general
+% t puntos en el tiempo
+% si c=d/(h*h)<1 el esquema es estable.
+% Martha Leticia Ruiz Zavala. Noviembre 2016
+% Ejemplo: [x,y,Phi,c]=fluxCNT(5,1000,@f,@g,@H,1);
+%% Inicialización
+close all;
+h=1/(m-1);
+Phi=zeros(m,m,t);
+T=linspace(0,10,t);
+dt = T(2)-T(1);
+c=dt/(h*h);
+if c>1
+    h = msgbox('El esquema es inestable, cosas extrañas pueden suceder', 'dt/(h^2)>1','warn');
+end
+[x,y,Phi0]=fluxCN(m,f,g,H,alpha);
+%Condiciones iniciales
+Phi(:,:,1)=Phi0;
+
+%% Calculamos con un paso de tiempo hacia adelante
+for k=2:t
+    % Puntos contiguos y no contiguos a las fronteras (rellenito)
+    for j=2:(m-1)
+        for i=2:(m-1)
+            Phi(i,j,k)=c*(Phi(i-1,j,k-1)+Phi(i+1,j,k-1)-4*Phi(i,j,k-1)+...
+               f([x(i,j),y(i,j)],(k-2)*dt)*h*h)+Phi(i,j,k-1);
+            if (i==2) % Superior
+                Phi(i,j,k)=Phi(i,j,k)+c*(g([x(1,j),y(1,j)],(k-2)*dt)+...
+                    Phi(i,j-1,k-1));
+            elseif (i==(m-1)) % Inferior
+                Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i,j+1,k-1)+...
+                    g([x(m,j),y(m,j)],(k-2)*dt));
+            else %rellenito
+                Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i,j-1,k-1)+Phi(i,j+1,k-1));                
+            end
+        end
+    end
+    
+    % Puntos contiguos a las fronteras verticales
+    for i=2:(m-1)
+        % Izquierda 
+        j=1;
+        Phi(i,j,k)=c*((2*h)*H([x(i,1),y(i,1)],(k-2)*dt)/alpha+...
+            2*Phi(i,j+1,k-1)-4*Phi(i,j,k-1)+...
+            f([x(i,j),y(i,j)],(k-2)*dt)*h*h)+Phi(i,j,k-1);
+        if (i==2) % esquina superior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([x(1,1),y(1,1)],(k-2)*dt)+...
+                Phi(i+1,j,k-1));
+        elseif (i==(m-1)) % esquina inferior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+...
+                g([x(m,1),y(m,1)],(k-2)*dt));
+        else %rellenito
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i+1,j,k-1)+Phi(i-1,j,k-1));
+        end
+        % Derecha 
+        j=m;
+        Phi(i,j,k)=c*(2*Phi(i,j-1,k-1)+...
+            (2*h)*H([x(i,m),y(i,m)],(k-2)*dt)/alpha+...
+            -4*Phi(i,j,k-1)+f([x(i,j),y(i,j)],(k-2)*dt)*h*h)+Phi(i,j,k-1);
+        if (i==2) % esquina superior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([x(1,m),y(1,m)],(k-2)*dt)+...
+                Phi(i+1,j,k-1));
+        elseif (i==(m-1)) % esquina inferior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i-1,j,k-1)+...
+                g([x(m,m),y(m,m)],(k-2)*dt));
+        else
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i+1,j,k-1)+Phi(i-1,j,k-1));
+        end
+    end
+    % Condiciones en la frontera (Dirichlet)
+    % Orilla superior
+    for j=1:m
+        Phi(1,j,k)=g([x(1,j),y(1,j)],(k-1)*dt);
+    end
+    % Orilla inferior
+    for j=1:m
+        Phi(m,j,k)=g([x(m,j),y(m,j)],(k-1)*dt);
+    end
+end
+for k=1:t
+    surf(x,y,Phi(:,:,k));pause(.4);
+end
+end
