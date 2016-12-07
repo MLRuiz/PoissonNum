@@ -1,0 +1,104 @@
+function [X,Y,Phi,c]=volT(m,t,f,g)
+%% Especificaciones
+% Aproxima, por medio de volumenes finitos, la ecuaci\'on de Laplace
+% transiente con condiciones de Dirichlet en las fronteras. En un cuadrado
+% de [0,1]x[0,1]. Que se mueve en el tiempo de 0  a 1.
+% m n\'umero de puntos de la malla
+% f funci\'on de velocidad
+% g condiciones de frontera
+% Phi potencial
+% t puntos en el tiempod
+% si c=d/(h*h)<1 el esquema es estable.
+% Martha Leticia Ruiz Zavala. Noviembre 2016
+% Ejemplo: [X,Y,Phi,c]=volT(5,1000,@f,@g);
+
+%% Inicialización
+h=1/(m-1);
+Phi=zeros(m-1,m-1,t);
+T=linspace(0,1,t);
+dt = T(2)-T(1);
+c=dt/(h*h);
+if c/(h*h)>1
+    h = msgbox('El esquema es inestable, cosas extrañas pueden suceder', 'dt/(h^4)>1','warn');
+end
+[X,Y,Phi0]=vol(m,f,g);
+% Condiciones iniciales
+Phi(:,:,1)=Phi0;
+for k=2:t
+    %% Puntos no contiguos a la frontera
+    for j=3:(m-3)
+        for i=3:(m-3)
+            Phi(i,j,k)=Phi(i,j,k-1)+c*(Phi(i-1,j,k-1)+Phi(i+1,j,k-1)+...
+                Phi(i,j-1,k-1)+Phi(i,j+1,k-1)-4*Phi(i,j,k-1))/h/h+...
+                c*f([X(i,j),Y(i,j)],(k-2)*dt);
+        end
+    end
+    %% Puntos contiguos a las fronteras verticales
+    for i=2:(m-2)
+        % Izquierda
+        j=2;
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(g([X(i,j-1),Y(i,j-1)],(k-2)*dt)+...
+            Phi(i,j+1,k-1)-4*Phi(i,j,k-1))/h/h+...
+            c*f([X(i,j),Y(i,j)],(k-2)*dt);
+        if(i==2) % esquina superior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([X(i-1,j),Y(i-1,j)],(k-2)*dt)+...
+                Phi(i+1,j,k-1))/h/h;
+        elseif (i==(m-2)) % esquina inferior izquierda
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([X(i+1,j),Y(i+1,j)],(k-2)*dt)+...
+                Phi(i-1,j,k-1))/h/h;
+        else
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i+1,j,k-1)+Phi(i-1,j,k-1))/h/h;
+        end
+        
+        % Derecha
+        j=m-2;
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(g([X(i,j+1),Y(i,j+1)],(k-2)*dt)+...
+            Phi(i,j-1,k-1)-4*Phi(i,j,k-1))/h/h+...
+            c*f([X(i,j),Y(i,j)],(k-2)*dt);
+        if (i==2) % esquina superior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([X(i-1,j),Y(i-1,j)],(k-2)*dt)+...
+                Phi(i+1,j,k-1))/h/h;
+        elseif (i==(m-2)) % esquina inferior derecha
+            Phi(i,j,k)=Phi(i,j,k)+c*(g([X(i+1,j),Y(i+1,j)],(k-2)*dt)+...
+                Phi(i-1,j,k-1))/h/h;
+        else
+            Phi(i,j,k)=Phi(i,j,k)+c*(Phi(i+1,j,k-1)+Phi(i-1,j,k-1))/h/h;
+        end
+    end
+    
+    %% Puntos contiguos a las fronteras horizontales
+    for j=3:m-3
+        % Inferior
+        i=m-2;
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(g([X(i+1,j),Y(i+1,j)],(k-2)*dt)+...
+            Phi(i-1,j,k-1)+Phi(i,j-1,k-1)+Phi(i,j+1,k-1)-...
+            4*Phi(i,j,k-1))/h/h+c*f([X(i,j),Y(i,j)],(k-2)*dt);
+        % Superior
+        i=2;
+        Phi(i,j,k)=Phi(i,j,k-1)+c*(g([X(i-1,j),Y(i-1,j)],(k-2)*dt)+...
+            Phi(i+1,j,k-1)+Phi(i,j-1,k-1)+Phi(i,j+1,k-1)-...
+            4*Phi(i,j,k-1))/h/h+c*f([X(i,j),Y(i,j)],(k-2)*dt);
+    end
+    %% Condiciones en la frontera
+    % Orilla izquierda
+    for i=1:m-1
+        Phi(i,1,k)=g([X(i,1),Y(i,1)],(k-1)*dt);
+    end
+    % Orilla inferior
+    for j=1:m-1
+        Phi(m-1,j,k)=g([X(m-1,j),Y(m-1,j)],(k-1)*dt);
+    end
+    % Orilla derecha
+    for i=1:m-1
+        Phi(i,m-1,k)=g([X(i,m-1),Y(i,m-1)],(k-1)*dt);
+    end
+    % Orilla superior
+    for j=1:m-1
+        Phi(1,j,k)=g([X(1,j),Y(1,j)],(k-1)*dt);
+    end
+end
+%% Graficamos la soluci\'on
+for k=1:t
+    surf(X,Y,Phi(:,:,k));pause(.2);
+end
+end
